@@ -2,8 +2,9 @@ import express, { Request, Response } from "express";
 import { spawn, exec as syncExec } from "child_process";
 import { randomUUID } from "crypto";
 import { promisify } from 'util';
+import findVidsrc from './m3u8-sources/vidsrc';
+import findHydra from './m3u8-sources/hydrahd';
 
-const vidsrcApi = "https://vidsrc-embed.su/embed";
 const ytDlpPath = "yt-dlp"; // Adjust to your yt-dlp binary path
 const app = express();
 app.use(express.text());
@@ -16,73 +17,7 @@ const sleep = (ms: number): Promise<void> => {
     return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const get = async (url: string): Promise<string | null> => {
-    console.log(`[INFO] GET ${url}`);
-    const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" }, // Mimic browser
-    });
-    if (!res.ok) {
-        console.error(`[ERROR] Invalid request url: ${url}`);
-        return null;
-    }
-    return res.text();
-};
-
-const findCloudnestraUrls = (input: string): string[] => {
-    const pattern = /\/\/cloudnestra\.com\/rcp\/[^\s"']*/g;
-    return input.match(pattern)?.map(e => `https:${e}`) ?? [];
-};
-
-const findProrcpUrls = (input: string): string[] => {
-    const pattern = /\/prorcp\/[^\s"']*/g;
-    return input.match(pattern)?.map(e => `https://cloudnestra.com${e}`) ?? [];
-};
-
-const findMasterM3u8Urls = (input: string): string[] => {
-    const pattern = /https:\/\/[^\s"']*master\.m3u8/g;
-    return input.match(pattern) || [];
-};
-
-app.get("*\w", async (req: Request, res: Response) => {
-    // Grab embed HTML from vidsrc
-    let vidsrcUrl = `${vidsrcApi}${req.url}`;
-    let body = await get(vidsrcUrl);
-    if (!body) {
-        res.status(404).send("Invalid vidsrc endpoint");
-        return;
-    }
-
-    // Grab cloudnestra rcp URL
-    const cloudnestraUrl = findCloudnestraUrls(body)[0] ?? null;
-    if (!cloudnestraUrl) {
-        res.status(404).send("Could not find cloudnestra url");
-        return;
-    }
-
-    // Grab cloudnestra prorcp URL HTML
-    body = await get(cloudnestraUrl);
-    if (!body) {
-        res.status(404).send("Invalid cloudnestra rcp endpoint");
-        return;
-    }
-    const protorcpUrl = findProrcpUrls(body)[0] ?? null;
-    if (!protorcpUrl) {
-        res.status(404).send("Could not find prorcp url in cloudnestra html");
-        return;
-    }
-    body = await get(protorcpUrl);
-    if (!body) {
-        res.status(404).send("Invalid cloudnestra prorcp endpoint");
-        return;
-    }
-
-    // Find the master.m3u8 URL
-    const m3u8Url = findMasterM3u8Urls(body)[0] ?? null;
-    if (!m3u8Url) {
-        res.status(404).send("Could not find master.m3u8 url");
-        return;
-    }
-
+const download = (m3u8url: string, res: Response) => {
     // Generate unique filename since URL format varies
     const uniqueId = randomUUID();
 
@@ -94,7 +29,7 @@ app.get("*\w", async (req: Request, res: Response) => {
 
         // Spawn yt-dlp process
         const ytDlp = spawn(ytDlpPath, [
-            m3u8Url,
+            m3u8url,
             "-o", "-", // Output to stdout for streaming
         ]);
 
@@ -122,12 +57,39 @@ app.get("*\w", async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
-        console.error(`[ERROR] Download failed for ${req.url}:`, error);
+        console.error(`[ERROR] Download failed: `, error);
         if (!res.headersSent) {
             res.status(500).send(`Download failed: ${error}`);
         }
     }
+}
+
+app.get("/:tmdbid", async (req: Request, res: Response) => {
+    const m3u8url = await findHydra({ tmdbid: req.params.tmdbid });
+    if (!m3u8url) {
+        res.send("Failed to find source media");
+        return;
+    }
+    download(m3u8url, res);
 });
+
+app.get("/:tmdbid/:season/:episode", async (req: Request, res: Response) => {
+    const m3u8url = await findHydra({ tmdbid: req.params.tmdbid, season: req.params.season, episode: req.params.episode });
+    if (!m3u8url) {
+        res.send("Failed to find source media");
+        return;
+    }
+    download(m3u8url, res);
+});
+
+// app.get("/vidsrc/*\w", async (req: Request, res: Response) => {
+//     const m3u8url = await findVidsrc(req.url.replace("/vidsrc", ""));
+//     if (!m3u8url) {
+//         res.send("Failed to find source media");
+//         return;
+//     }
+//     download(m3u8url, res);
+// });
 
 // Check if yt-dlp binary exists and is executable
 const checkYtDlp = async (): Promise<boolean> => {
