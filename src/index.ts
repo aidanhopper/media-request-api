@@ -65,21 +65,27 @@ const download = (m3u8url: string, res: Response) => {
 }
 
 app.get("/:tmdbid", async (req: Request, res: Response) => {
-    const m3u8url = await findHydra({ tmdbid: req.params.tmdbid });
+    let m3u8url = await findHydra({ tmdbid: req.params.tmdbid });
+    if (m3u8url) {
+        download(m3u8url, res);
+        return;
+    }
     if (!m3u8url) {
         res.send("Failed to find source media");
         return;
     }
-    download(m3u8url, res);
 });
 
 app.get("/:tmdbid/:season/:episode", async (req: Request, res: Response) => {
     const m3u8url = await findHydra({ tmdbid: req.params.tmdbid, season: req.params.season, episode: req.params.episode });
+    if (m3u8url) {
+        download(m3u8url, res);
+        return;
+    }
     if (!m3u8url) {
         res.send("Failed to find source media");
         return;
     }
-    download(m3u8url, res);
 });
 
 // app.get("/vidsrc/*\w", async (req: Request, res: Response) => {

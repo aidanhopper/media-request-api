@@ -19,7 +19,6 @@ const findMasterM3u8Urls = (input: string): string[] => {
 
 const find = async (endpoint: string) => {
     const vidsrcUrl = `${vidsrcApi}${endpoint}`;
-    console.log(vidsrcUrl);
     let body = await get(vidsrcUrl);
     if (!body) {
         return null;

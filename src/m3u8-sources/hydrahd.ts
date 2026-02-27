@@ -15,11 +15,11 @@ const findM3u8Urls = (input: string): string[] => {
 const find = async ({ tmdbid, season, episode }: { tmdbid: string, season?: string, episode?: string }) => {
     let body;
     if (season && episode) {
-        body = await get(`https://hydrahd.ru/ajax/1_s1.php?tmdbid=${tmdbid}&season=${season}&episode=${episode}`,
+        body = await get(`https://hydrahd.me/ajax/1_s1.php?tmdbid=${tmdbid}&season=${season}&episode=${episode}`,
             { 'Sec-Fetch-Site': 'same-origin' });
     }
     else {
-        body = await get(`https://hydrahd.ru/ajax/1_m1.php?tmdbid=${tmdbid}`,
+        body = await get(`https://hydrahd.me/ajax/1_m1.php?tmdbid=${tmdbid}`,
             { 'Sec-Fetch-Site': 'same-origin' });
     }
     if (!body) {
