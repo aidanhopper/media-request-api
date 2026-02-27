@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import { spawn, exec as syncExec } from "child_process";
 import { randomUUID } from "crypto";
 import { promisify } from 'util';
-import findVidsrc from './m3u8-sources/vidsrc';
+import VidsrcM3U8Builder from './m3u8-sources/vidsrc';
 import findHydra from './m3u8-sources/hydrahd';
 
 const ytDlpPath = "yt-dlp"; // Adjust to your yt-dlp binary path
@@ -27,11 +27,17 @@ const download = (m3u8url: string, res: Response) => {
         res.setHeader("Content-Type", "video/x-matroska");
         res.setHeader("Content-Disposition", `attachment; filename="${uniqueId}.mkv"`);
 
-        // Spawn yt-dlp process
-        const ytDlp = spawn(ytDlpPath, [
+        const cmd = [
             m3u8url,
+            "-f", "bv*+ba/best",
+            "--limit-rate", "500K",
             "-o", "-", // Output to stdout for streaming
-        ]);
+        ]
+
+        // Spawn yt-dlp process
+        const ytDlp = spawn(ytDlpPath, cmd);
+
+        console.log(`[INFO] CMD [ ${ytDlpPath} ${cmd.join(" ")} ]`);
 
         // Pipe yt-dlp output to response
         ytDlp.stdout.pipe(res);
@@ -65,7 +71,8 @@ const download = (m3u8url: string, res: Response) => {
 }
 
 app.get("/:tmdbid", async (req: Request, res: Response) => {
-    let m3u8url = await findHydra({ tmdbid: req.params.tmdbid });
+    const builder = new VidsrcM3U8Builder("https://vsembed.ru/embed");
+    let m3u8url = await builder.build({ tmdbid: req.params.tmdbid })
     if (m3u8url) {
         download(m3u8url, res);
         return;
@@ -77,7 +84,8 @@ app.get("/:tmdbid", async (req: Request, res: Response) => {
 });
 
 app.get("/:tmdbid/:season/:episode", async (req: Request, res: Response) => {
-    const m3u8url = await findHydra({ tmdbid: req.params.tmdbid, season: req.params.season, episode: req.params.episode });
+    const builder = new VidsrcM3U8Builder("https://vsembed.ru/embed");
+    let m3u8url = await builder.build({ tmdbid: req.params.tmdbid, season: req.params.season, episode: req.params.episode });
     if (m3u8url) {
         download(m3u8url, res);
         return;
