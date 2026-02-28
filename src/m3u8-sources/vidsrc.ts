@@ -42,6 +42,7 @@ class VidsrcM3U8Builder {
     }
 
     private cleanM3U8Url(m3u8Url: string) {
+        console.log(`[INFO] Cleaning ${m3u8Url}`)
         return m3u8Url.replace(/{v1}/, "neonhorizonworkshops.com");
     }
 
@@ -66,6 +67,7 @@ class VidsrcM3U8Builder {
         }
         const prorcpUrl = this.findProrcpUrls(body)[0] ?? null;
         if (!prorcpUrl) {
+            console.log("[INFO] Failed to find cloudnestra prorcp url inside body")
             return null;
         }
         body = await get(prorcpUrl, { "Referer": cloudnestraUrl });
@@ -76,6 +78,7 @@ class VidsrcM3U8Builder {
         // Find the master.m3u8 URL
         const m3u8Url = this.findMasterM3u8Urls(body)[0] ?? null;
         if (!m3u8Url) {
+            console.log("[INFO] Failed to find m3u8 url")
             return null;
         }
 

@@ -3,7 +3,6 @@ import { spawn, exec as syncExec } from "child_process";
 import { randomUUID } from "crypto";
 import { promisify } from 'util';
 import VidsrcM3U8Builder from './m3u8-sources/vidsrc';
-import findHydra from './m3u8-sources/hydrahd';
 
 const ytDlpPath = "yt-dlp"; // Adjust to your yt-dlp binary path
 const app = express();
@@ -12,10 +11,6 @@ app.use(express.text());
 const PORT = 4321;
 
 const exec = promisify(syncExec);
-
-const sleep = (ms: number): Promise<void> => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-};
 
 const download = (m3u8url: string, res: Response) => {
     // Generate unique filename since URL format varies
@@ -91,19 +86,11 @@ app.get("/:tmdbid/:season/:episode", async (req: Request, res: Response) => {
         return;
     }
     if (!m3u8url) {
+        console.log("[ERROR] Failed to get m3u8 url from vidsrc")
         res.send("Failed to find source media");
         return;
     }
 });
-
-// app.get("/vidsrc/*\w", async (req: Request, res: Response) => {
-//     const m3u8url = await findVidsrc(req.url.replace("/vidsrc", ""));
-//     if (!m3u8url) {
-//         res.send("Failed to find source media");
-//         return;
-//     }
-//     download(m3u8url, res);
-// });
 
 // Check if yt-dlp binary exists and is executable
 const checkYtDlp = async (): Promise<boolean> => {
