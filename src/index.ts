@@ -11,6 +11,7 @@ const app = express();
 app.use(express.text());
 
 const PORT = 4321;
+const YTDLP_DOWNLOAD_RATE = process.env.YTDLP_DOWNLOAD_RATE || "500K"
 
 const exec = promisify(syncExec);
 
@@ -24,10 +25,11 @@ const download = async (m3u8url: string, res: Response) => {
         res.setHeader("Content-Type", "video/x-matroska");
         res.setHeader("Content-Disposition", `attachment; filename="${uniqueId}.mkv"`);
 
+
         const cmd = [
             m3u8url,
             "-f", "bv*+ba/best",
-            "--limit-rate", "500K",
+            "--limit-rate", YTDLP_DOWNLOAD_RATE,
             "-o", "-", // Output to stdout for streaming
         ]
 
