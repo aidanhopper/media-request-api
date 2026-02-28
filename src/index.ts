@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import { spawn, exec as syncExec } from "child_process";
 import { randomUUID } from "crypto";
 import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs/promises';
 import VidsrcM3U8Builder from './m3u8-sources/vidsrc';
 
 const ytDlpPath = "yt-dlp"; // Adjust to your yt-dlp binary path
@@ -12,7 +14,7 @@ const PORT = 4321;
 
 const exec = promisify(syncExec);
 
-const download = (m3u8url: string, res: Response) => {
+const download = async (m3u8url: string, res: Response) => {
     // Generate unique filename since URL format varies
     const uniqueId = randomUUID();
 
@@ -29,8 +31,19 @@ const download = (m3u8url: string, res: Response) => {
             "-o", "-", // Output to stdout for streaming
         ]
 
+        // Base downloads folder
+        const baseDir = path.resolve("downloads");
+
+        // Unique working directory
+        const workingDir = path.join(baseDir, uniqueId);
+
+        // Create it
+        await fs.mkdir(workingDir, { recursive: true });
+
         // Spawn yt-dlp process
-        const ytDlp = spawn(ytDlpPath, cmd);
+        const ytDlp = spawn(ytDlpPath, cmd, {
+            cwd: workingDir,
+        });
 
         console.log(`[INFO] CMD [ ${ytDlpPath} ${cmd.join(" ")} ]`);
 
@@ -42,14 +55,35 @@ const download = (m3u8url: string, res: Response) => {
             console.error(`[INFO] yt-dlp: ${data}`);
         });
 
-        ytDlp.on("error", (error) => {
+        ytDlp.on("error", async (error) => {
+            try {
+                await fs.rm(workingDir, {
+                    recursive: true,
+                    force: true,
+                });
+                console.log("Cleaned up directory:", workingDir);
+            } catch (err) {
+                console.error("Failed to remove directory:", err);
+            }
+
             console.error(`[ERROR] yt-dlp: ${error.message}`);
+
             if (!res.headersSent) {
                 res.status(500).send(`Download failed: ${error.message}`);
             }
         });
 
-        ytDlp.on("close", (code) => {
+        ytDlp.on("close", async (code) => {
+            try {
+                await fs.rm(workingDir, {
+                    recursive: true,
+                    force: true,
+                });
+                console.log("Cleaned up directory:", workingDir);
+            } catch (err) {
+                console.error("Failed to remove directory:", err);
+            }
+
             if (code !== 0) {
                 console.error(`[ERROR] yt-dlp exited with code ${code}`);
                 if (!res.headersSent) {
@@ -69,7 +103,7 @@ app.get("/:tmdbid", async (req: Request, res: Response) => {
     const builder = new VidsrcM3U8Builder("https://vsembed.ru/embed");
     let m3u8url = await builder.build({ tmdbid: req.params.tmdbid })
     if (m3u8url) {
-        download(m3u8url, res);
+        await download(m3u8url, res);
         return;
     }
     if (!m3u8url) {
