@@ -29,6 +29,7 @@ const download = async (m3u8url: string, res: Response) => {
         const cmd = [
             m3u8url,
             "-f", "bv*+ba/best",
+            "--fragment-retries", "50",
             "--limit-rate", YTDLP_DOWNLOAD_RATE,
             "-o", "-", // Output to stdout for streaming
         ]
