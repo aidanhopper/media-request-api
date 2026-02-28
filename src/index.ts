@@ -109,6 +109,7 @@ app.get("/:tmdbid", async (req: Request, res: Response) => {
         return;
     }
     if (!m3u8url) {
+        res.status(500)
         res.send("Failed to find source media");
         return;
     }
